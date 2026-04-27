@@ -21,15 +21,14 @@
 
   // ⬇️ 여기를 내 Firebase 설정으로 교체하세요
   const firebaseConfig = {
-  apiKey: "AIzaSyDU0Ot1-i2u-TjISUI-rmsKutXooiqkNW4",
-  authDomain: "study-planner-a8773.firebaseapp.com",
-  databaseURL: "https://study-planner-a8773-default-rtdb.firebaseio.com",
-  projectId: "study-planner-a8773",
-  storageBucket: "study-planner-a8773.firebasestorage.app",
-  messagingSenderId: "472623599626",
-  appId: "1:472623599626:web:1843079ed6d9d59d9ccff3",
-  measurementId: "G-HTSPJS7JDH"
-};
+    apiKey: "YOUR_API_KEY",
+    authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+    databaseURL: "https://YOUR_PROJECT_ID-default-rtdb.firebaseio.com",
+    projectId: "YOUR_PROJECT_ID",
+    storageBucket: "YOUR_PROJECT_ID.appspot.com",
+    messagingSenderId: "YOUR_SENDER_ID",
+    appId: "YOUR_APP_ID"
+  };
 
   let app, db;
   let firebaseReady = false;
@@ -790,8 +789,24 @@ function loadFromFirebase() {
   unsubscribe = fb.onValue(dbRef, (snapshot) => {
     const data = snapshot.val();
     if (data) {
-      if (data.sched) sched = data.sched;
-      if (data.presets) presets = data.presets;
+      if (data.sched) {
+        // Firebase가 배열을 객체로 변환하는 문제 수정
+        const raw = data.sched;
+        initSched();
+        for (let di = 0; di < 7; di++) {
+          const dayData = raw[di] || raw[String(di)];
+          if (dayData) {
+            ALL_SLOTS.forEach(slot => {
+              if (dayData[slot] !== undefined) sched[di][slot] = dayData[slot];
+            });
+          }
+        }
+      }
+      if (data.presets) {
+        // presets도 배열 복원
+        const rawP = data.presets;
+        presets = Array.isArray(rawP) ? rawP : Object.values(rawP);
+      }
     } else {
       initSched();
       presets = [...DEFAULT_PRESETS];
