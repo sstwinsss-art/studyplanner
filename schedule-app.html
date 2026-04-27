@@ -1,0 +1,1169 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="우리 아이 스케줄">
+<title>우리 아이 주간 스케줄</title>
+<link href="https://fonts.googleapis.com/css2?family=Gaegu:wght@400;700&family=Nanum+Gothic:wght@400;700;800&display=swap" rel="stylesheet">
+
+<!-- ══════════════════════════════════════════════════════════════
+     🔥 FIREBASE 설정
+     아래 firebaseConfig 안의 값을 본인 Firebase 프로젝트 값으로 교체하세요!
+     (설정 방법은 앱 안의 안내를 참고하세요)
+═══════════════════════════════════════════════════════════════ -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import { getDatabase, ref, set, get, onValue } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+
+  // ⬇️ 여기를 내 Firebase 설정으로 교체하세요
+  const firebaseConfig = {
+  apiKey: "AIzaSyDU0Ot1-i2u-TjISUI-rmsKutXooiqkNW4",
+  authDomain: "study-planner-a8773.firebaseapp.com",
+  databaseURL: "https://study-planner-a8773-default-rtdb.firebaseio.com",
+  projectId: "study-planner-a8773",
+  storageBucket: "study-planner-a8773.firebasestorage.app",
+  messagingSenderId: "472623599626",
+  appId: "1:472623599626:web:1843079ed6d9d59d9ccff3",
+  measurementId: "G-HTSPJS7JDH"
+};
+
+  let app, db;
+  let firebaseReady = false;
+
+  try {
+    if (firebaseConfig.apiKey !== "YOUR_API_KEY") {
+      app = initializeApp(firebaseConfig);
+      db = getDatabase(app);
+      firebaseReady = true;
+    }
+  } catch(e) {
+    console.warn("Firebase 초기화 실패:", e);
+  }
+
+  window._fb = { firebaseReady, db, ref, set, get, onValue };
+</script>
+
+<style>
+:root {
+  --bg: #F7F8FC;
+  --card: #FFFFFF;
+  --primary: #5C7CFA;
+  --primary-light: #EEF2FF;
+  --danger: #FF6B6B;
+  --shadow: 0 2px 16px rgba(0,0,0,0.07);
+  --radius: 14px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Nanum Gothic', sans-serif;
+  background: var(--bg);
+  min-height: 100vh;
+}
+
+/* ── 진입 화면 ── */
+#loginScreen {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: linear-gradient(135deg, #EEF2FF 0%, #F7F8FC 60%, #FFF0F6 100%);
+}
+.login-card {
+  background: white;
+  border-radius: 24px;
+  padding: 36px 28px;
+  width: 100%;
+  max-width: 380px;
+  box-shadow: 0 8px 40px rgba(92,124,250,0.13);
+  text-align: center;
+}
+.login-emoji { font-size: 3rem; margin-bottom: 8px; }
+.login-title {
+  font-family: 'Gaegu', cursive;
+  font-size: 2rem;
+  color: var(--primary);
+  margin-bottom: 4px;
+}
+.login-sub { font-size: 0.78rem; color: #bbb; margin-bottom: 28px; letter-spacing: 1px; }
+
+.who-btns { display: flex; flex-direction: column; gap: 12px; }
+.who-btn {
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  padding: 16px 20px;
+  border-radius: 14px;
+  border: 2px solid #eee;
+  background: white;
+  font-family: 'Nanum Gothic', sans-serif;
+  font-size: 1.05rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.18s;
+  color: #444;
+}
+.who-btn:hover { border-color: var(--primary); color: var(--primary); transform: translateY(-2px); box-shadow: 0 6px 18px rgba(92,124,250,0.15); }
+.who-btn.child-btn { background: #EEF2FF; border-color: #c5caff; }
+.who-btn.parent-btn { background: #FFF0F6; border-color: #f9a8d4; color: #be185d; }
+.who-btn.parent-btn:hover { border-color: #ec4899; color: #be185d; }
+
+.divider { font-size: 0.72rem; color: #ccc; margin: 6px 0; }
+
+/* 아이 선택 */
+.child-select-btns { display: flex; flex-direction: column; gap: 10px; margin-top: 4px; }
+.child-select-btn {
+  padding: 14px;
+  border-radius: 12px;
+  border: 2px solid #e0e4ff;
+  background: #f8f9ff;
+  font-family: 'Gaegu', cursive;
+  font-size: 1.25rem;
+  cursor: pointer;
+  transition: all 0.15s;
+  color: #444;
+}
+.child-select-btn:hover { border-color: var(--primary); background: #EEF2FF; color: var(--primary); }
+
+/* 부모 비밀번호 */
+.parent-pw-box { display: flex; flex-direction: column; gap: 10px; margin-top: 4px; }
+.parent-pw-box input {
+  border: 2px solid #fce7f3;
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-size: 1rem;
+  outline: none;
+  text-align: center;
+  letter-spacing: 4px;
+  font-weight: 800;
+  transition: border-color 0.2s;
+}
+.parent-pw-box input:focus { border-color: #ec4899; }
+.btn-pw {
+  padding: 12px;
+  border-radius: 10px;
+  border: none;
+  background: #ec4899;
+  color: white;
+  font-family: 'Nanum Gothic', sans-serif;
+  font-weight: 800;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.btn-pw:hover { background: #db2777; transform: translateY(-1px); }
+.pw-error { color: #ef4444; font-size: 0.78rem; min-height: 18px; }
+
+.back-link {
+  margin-top: 14px;
+  font-size: 0.75rem;
+  color: #aaa;
+  cursor: pointer;
+  text-decoration: underline;
+}
+.back-link:hover { color: var(--primary); }
+
+/* ── Firebase 설정 안내 배너 ── */
+.setup-banner {
+  background: #FFF9C4;
+  border: 2px solid #FDD835;
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin-top: 20px;
+  font-size: 0.78rem;
+  color: #795548;
+  text-align: left;
+  line-height: 1.6;
+}
+.setup-banner strong { color: #e65100; }
+.setup-banner ol { padding-left: 16px; margin-top: 6px; }
+
+/* ── 앱 메인 화면 ── */
+#appScreen { display: none; }
+#appScreen.visible { display: block; }
+
+.topbar {
+  background: white;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.topbar-left { display: flex; align-items: center; gap: 8px; }
+.topbar-name {
+  font-family: 'Gaegu', cursive;
+  font-size: 1.3rem;
+  color: var(--primary);
+}
+.topbar-role {
+  font-size: 0.7rem;
+  background: #EEF2FF;
+  color: var(--primary);
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-weight: 800;
+}
+.topbar-role.parent { background: #FDF2F8; color: #be185d; }
+.btn-logout {
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: none;
+  background: #f5f5f5;
+  color: #aaa;
+  font-family: 'Nanum Gothic', sans-serif;
+  font-weight: 800;
+  font-size: 0.72rem;
+  cursor: pointer;
+  transition: all 0.13s;
+}
+.btn-logout:hover { background: #eee; color: #888; }
+
+/* 부모 탭 */
+.parent-tabs {
+  display: flex;
+  padding: 12px 16px 0;
+  gap: 8px;
+  background: white;
+}
+.ptab {
+  flex: 1;
+  padding: 10px;
+  border-radius: 10px 10px 0 0;
+  border: none;
+  background: #f5f5f5;
+  color: #aaa;
+  font-family: 'Nanum Gothic', sans-serif;
+  font-weight: 800;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.ptab.active { background: var(--primary); color: white; }
+
+/* 동기화 상태 */
+.sync-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 6px;
+  font-size: 0.72rem;
+  color: #aaa;
+  background: #fafbff;
+  border-bottom: 1px solid #f0f0f0;
+}
+.sync-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: #ccc;
+  transition: background 0.3s;
+}
+.sync-dot.synced { background: #40C057; }
+.sync-dot.syncing { background: #FAB005; animation: pulse 0.8s infinite; }
+.sync-dot.offline { background: #FF6B6B; }
+@keyframes pulse { 0%,100%{opacity:1}50%{opacity:0.4} }
+
+/* 스케줄 앱 내용 */
+.app-content { padding: 16px 16px 40px; }
+
+header { text-align: center; padding: 12px 0 6px; }
+h1 { font-family: 'Gaegu', cursive; font-size: 2rem; color: var(--primary); margin: 4px 0 2px; }
+.subtitle { font-size: 0.78rem; color: #bbb; letter-spacing: 1px; }
+
+.presets-panel {
+  background: var(--card); border-radius: var(--radius);
+  box-shadow: var(--shadow); padding: 14px 16px; margin-bottom: 16px;
+}
+.presets-panel h2 { font-size: 0.83rem; font-weight: 800; color: #888; letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 10px; }
+.presets-list { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.preset-tag {
+  display: inline-flex; align-items: center; gap: 5px;
+  border-radius: 20px; padding: 5px 12px;
+  font-size: 0.78rem; font-weight: 700;
+  cursor: pointer; user-select: none;
+  transition: transform 0.15s, box-shadow 0.15s;
+  border: 2px solid transparent; color: #3a3a5c;
+}
+.preset-tag:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.12); }
+.preset-tag.selected-preset { border-color: #333; box-shadow: 0 0 0 3px rgba(92,124,250,0.25); }
+.preset-tag .ptag-del {
+  background: rgba(0,0,0,0.15); border: none; border-radius: 50%;
+  width: 14px; height: 14px; font-size: 8px; cursor: pointer;
+  color: #555; display: none; align-items: center; justify-content: center;
+  padding: 0; line-height: 1;
+}
+.preset-tag:hover .ptag-del { display: inline-flex; }
+.add-preset-row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-top: 4px; }
+.add-preset-row input[type=text] {
+  flex: 1; min-width: 110px; max-width: 190px;
+  border: 2px solid #e8e8e8; border-radius: 9px;
+  padding: 6px 10px; font-family: 'Nanum Gothic', sans-serif;
+  font-size: 0.82rem; outline: none; transition: border-color 0.2s;
+}
+.add-preset-row input[type=text]:focus { border-color: var(--primary); }
+.color-mini-picker { display: flex; gap: 4px; flex-wrap: wrap; }
+.cmsw {
+  width: 20px; height: 20px; border-radius: 50%; cursor: pointer;
+  border: 3px solid transparent; transition: transform 0.13s, border-color 0.13s; flex-shrink: 0;
+}
+.cmsw:hover { transform: scale(1.2); }
+.cmsw.sel { border-color: #333; transform: scale(1.15); }
+.btn-add-preset {
+  padding: 6px 14px; border-radius: 9px; border: none;
+  background: var(--primary); color: white;
+  font-family: 'Nanum Gothic', sans-serif; font-weight: 800;
+  font-size: 0.8rem; cursor: pointer; transition: all 0.15s; white-space: nowrap;
+}
+.btn-add-preset:hover { background: #4c6ef5; transform: translateY(-1px); }
+.hint {
+  font-size: 0.72rem; color: #aaa; margin-top: 8px;
+  padding: 6px 10px; background: #f8f9ff; border-radius: 8px;
+  border-left: 3px solid #c5caff;
+}
+
+.timetable-wrapper {
+  overflow-x: auto; border-radius: var(--radius);
+  box-shadow: var(--shadow); background: var(--card); margin-bottom: 16px;
+}
+table { width: 100%; border-collapse: collapse; min-width: 480px; }
+thead th {
+  padding: 10px 4px; font-size: 0.8rem; font-weight: 800;
+  letter-spacing: 0.4px; position: sticky; top: 0; z-index: 10;
+}
+thead th.tc { background:#f7f8fc; color:#bbb; font-size:0.65rem; width:48px; min-width:48px; }
+thead th.tc-right { background:#f7f8fc; color:#bbb; font-size:0.65rem; width:48px; min-width:48px; }
+.day-mon{background:#FFF0F0;color:#E03131}
+.day-tue{background:#FFF4E6;color:#C96A00}
+.day-wed{background:#EBFBEE;color:#1E7E34}
+.day-thu{background:#E7F5FF;color:#1864AB}
+.day-fri{background:#F3F0FF;color:#6741D9}
+.day-sat{background:#FFF0F6;color:#C2255C}
+.day-sun{background:#E6FCF5;color:#087F5B}
+tbody tr { border-bottom: 1px solid #f2f2f2; }
+tbody tr.hr { border-top: 2px solid #e8e8e8; }
+td { padding: 2px 2px; vertical-align: top; height: 32px; }
+td.tl {
+  text-align:center; font-size:0.62rem; font-weight:700;
+  vertical-align:middle; background:#fafbff;
+  border-right:1px solid #efefef; white-space:nowrap;
+  color:#ccc; padding:0 2px; min-width:48px; width:48px;
+}
+td.tl.h { color:#999; font-size:0.66rem; }
+td.tr {
+  text-align:center; font-size:0.62rem; font-weight:700;
+  vertical-align:middle; background:#fafbff;
+  border-left:1px solid #efefef; white-space:nowrap;
+  color:#ccc; padding:0 2px; min-width:48px; width:48px;
+}
+td.tr.h { color:#999; font-size:0.66rem; }
+.cell-inner { min-height:26px; height:100%; position:relative; }
+.chip {
+  border-radius: 5px; padding: 3px 16px 3px 6px;
+  margin: 1px 0; font-size: 0.68rem; font-weight: 800;
+  cursor: pointer; position: relative;
+  animation: popIn 0.18s ease-out;
+  display: flex; align-items: flex-start; flex-direction: column; gap: 1px;
+  transition: filter 0.15s; color: #3a3a5c;
+}
+.chip:hover { filter: brightness(0.93); }
+@keyframes popIn { from{transform:scale(0.85);opacity:0} to{transform:scale(1);opacity:1} }
+.chip .chip-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; width: 100%; }
+.chip .chip-dur { font-size: 0.55rem; font-weight: 400; opacity: 0.7; }
+.chip .chip-memo { font-size: 0.62rem; font-weight: 400; opacity: 0.8; overflow: hidden; white-space: pre-wrap; word-break: break-all; line-height: 1.3; width: 100%; }
+.chip .del {
+  position:absolute; right:2px; top:3px;
+  background:rgba(0,0,0,0.15); border:none; border-radius:50%;
+  width:11px; height:11px; font-size:7px; cursor:pointer;
+  display:none; align-items:center; justify-content:center;
+  color:#555; padding:0; line-height:1;
+}
+.chip:hover .del { display:flex; }
+.addbtn {
+  width:100%; border:1.5px dashed #e0e0e0; border-radius:5px;
+  background:transparent; color:#ddd; font-size:0.8rem;
+  height:20px; cursor:pointer; transition:all 0.15s;
+  margin:1px 0; display:flex; align-items:center; justify-content:center;
+}
+.addbtn:hover { border-color:var(--primary); color:var(--primary); background:#f0f4ff; }
+
+/* 읽기 전용 (부모) */
+.readonly-mode .addbtn { display: none; }
+.readonly-mode .del { display: none !important; }
+.readonly-mode .presets-panel { display: none; }
+
+/* 요약 */
+.summary {
+  background:var(--card); border-radius:var(--radius);
+  padding:13px 16px; box-shadow:var(--shadow); margin-bottom:14px;
+}
+.summary h2 { font-family:'Gaegu',cursive; font-size:1.1rem; color:#666; margin-bottom:8px; }
+.slist { display:flex; flex-wrap:wrap; gap:5px; }
+.stag {
+  display:flex; align-items:center; gap:4px;
+  border-radius:20px; padding:3px 9px;
+  font-size:0.72rem; font-weight:700;
+}
+.scnt { font-size:0.58rem; background:rgba(0,0,0,0.1); border-radius:20px; padding:1px 5px; color:#3a3a5c; }
+
+/* 모달 */
+.overlay {
+  display:none; position:fixed; inset:0;
+  background:rgba(30,30,50,0.28); z-index:200;
+  align-items:center; justify-content:center; backdrop-filter:blur(3px);
+}
+.overlay.open { display:flex; }
+.modal {
+  background:white; border-radius:20px; padding:22px;
+  width:92%; max-width:360px;
+  box-shadow:0 16px 50px rgba(0,0,0,0.16);
+  animation:slideUp 0.22s ease-out;
+}
+@keyframes slideUp { from{transform:translateY(20px);opacity:0} to{transform:translateY(0);opacity:1} }
+.modal h3 { font-family:'Gaegu',cursive; font-size:1.35rem; color:#333; margin-bottom:2px; }
+.minfo { font-size:0.72rem; color:#aaa; margin-bottom:12px; }
+.modal label { display:block; font-size:0.68rem; font-weight:800; color:#aaa; margin:10px 0 4px; letter-spacing:0.5px; text-transform:uppercase; }
+.dur-btns { display:flex; gap:5px; flex-wrap:wrap; margin-top:2px; }
+.db { padding:4px 9px; border-radius:20px; border:2px solid #e8e8e8; background:white; font-family:'Nanum Gothic',sans-serif; font-size:0.7rem; font-weight:700; cursor:pointer; color:#aaa; transition:all 0.13s; }
+.db:hover:not(:disabled) { border-color:var(--primary); color:var(--primary); }
+.db.sel { border-color:var(--primary); background:var(--primary); color:white; }
+.db:disabled { opacity:0.3; cursor:not-allowed; }
+.mactions { display:flex; gap:7px; margin-top:16px; }
+.btn { flex:1; padding:10px; border-radius:10px; border:none; font-family:'Nanum Gothic',sans-serif; font-weight:800; font-size:0.84rem; cursor:pointer; transition:transform 0.13s,box-shadow 0.13s; }
+.btn:hover { transform:translateY(-1px); box-shadow:0 4px 12px rgba(0,0,0,0.1); }
+.bp { background:var(--primary); color:white; }
+.bs { background:#f5f5f5; color:#aaa; }
+.dur-direct { background:#f8f9ff; border-radius:10px; padding:10px 12px; margin-top:4px; }
+.dur-direct-row { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+.dur-spin-group { display:flex; flex-direction:column; align-items:center; gap:2px; }
+.dur-spin-group input[type=number] { width:48px; text-align:center; border:2px solid #e0e4ff; border-radius:8px; padding:5px 3px; font-family:'Nanum Gothic',sans-serif; font-size:1rem; font-weight:800; color:#444; outline:none; -moz-appearance:textfield; }
+.dur-spin-group input[type=number]::-webkit-inner-spin-button,
+.dur-spin-group input[type=number]::-webkit-outer-spin-button { -webkit-appearance:none; }
+.dur-spin-btn { background:#eef0ff; border:none; border-radius:6px; width:48px; height:20px; font-size:0.68rem; cursor:pointer; color:#7c86c4; transition:background 0.13s; display:flex; align-items:center; justify-content:center; }
+.dur-spin-btn:hover { background:#dde2ff; color:var(--primary); }
+.dur-unit { font-size:0.74rem; font-weight:700; color:#aaa; margin-top:2px; }
+.dur-preview { font-size:0.95rem; font-weight:800; color:var(--primary); white-space:nowrap; align-self:center; }
+.memo-input { width:100%; border:2px solid #e0e4ff; border-radius:8px; padding:7px 10px; font-family:'Nanum Gothic',sans-serif; font-size:0.83rem; color:#444; outline:none; resize:vertical; min-height:52px; transition:border-color 0.2s; background:white; }
+.memo-input:focus { border-color:var(--primary); }
+
+.abar { display:flex; justify-content:center; gap:8px; flex-wrap:wrap; margin-bottom:10px; }
+.abtn { display:flex; align-items:center; gap:5px; padding:7px 13px; border-radius:10px; border:none; font-family:'Nanum Gothic',sans-serif; font-weight:800; font-size:0.75rem; cursor:pointer; transition:all 0.15s; box-shadow:0 2px 8px rgba(0,0,0,0.07); }
+.abtn:hover { transform:translateY(-1px); box-shadow:0 4px 12px rgba(0,0,0,0.12); }
+.ar{background:#f0f0f0;color:#aaa}
+.aprt{background:#4D96FF;color:white}
+
+@media print {
+  body{background:white;}
+  .topbar,.sync-bar,.presets-panel,.abar,.no-print{display:none!important}
+  .timetable-wrapper{box-shadow:none}
+  table{min-width:unset}
+  .del,.addbtn{display:none!important}
+  .chip{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+}
+</style>
+</head>
+<body>
+
+<!-- ══════════════ 진입 화면 ══════════════ -->
+<div id="loginScreen">
+  <div class="login-card">
+    <div class="login-emoji">📅</div>
+    <div class="login-title">우리 아이 스케줄</div>
+    <div class="login-sub">FAMILY WEEKLY SCHEDULE</div>
+
+    <div id="step-who" class="who-btns">
+      <button class="who-btn child-btn" onclick="showChildSelect()">🧒 아이예요</button>
+      <div class="divider">또는</div>
+      <button class="who-btn parent-btn" onclick="showParentLogin()">👨‍👩‍👧 부모님이에요</button>
+    </div>
+
+    <div id="step-child" style="display:none">
+      <div style="font-family:'Gaegu',cursive;font-size:1.1rem;color:#888;margin-bottom:10px;">누구인가요?</div>
+      <div class="child-select-btns">
+        <button class="child-select-btn" onclick="enterAsChild(0)">🌟 첫째</button>
+        <button class="child-select-btn" onclick="enterAsChild(1)">⭐ 둘째</button>
+      </div>
+      <div class="back-link" onclick="backToWho()">← 뒤로</div>
+    </div>
+
+    <div id="step-parent" style="display:none">
+      <div style="font-family:'Gaegu',cursive;font-size:1.1rem;color:#888;margin-bottom:10px;">부모님 확인용 비밀번호</div>
+      <div class="parent-pw-box">
+        <input type="password" id="pwInput" placeholder="비밀번호 입력" maxlength="12"
+               onkeydown="if(event.key==='Enter')checkPw()"/>
+        <div class="pw-error" id="pwError"></div>
+        <button class="btn-pw" onclick="checkPw()">🔓 확인하기</button>
+      </div>
+      <div class="back-link" onclick="backToWho()">← 뒤로</div>
+    </div>
+
+    <!-- Firebase 미설정 안내 -->
+    <div class="setup-banner" id="setupBanner" style="display:none">
+      ⚠️ <strong>Firebase 연결이 필요합니다</strong><br>
+      지금은 <strong>오프라인 모드</strong>로 동작합니다. 아이들이 각자 폰에서 작성해도 서버에 저장되지 않아요.<br><br>
+      <strong>실시간 공유를 하려면:</strong>
+      <ol>
+        <li><a href="https://console.firebase.google.com" target="_blank">Firebase 콘솔</a>에서 새 프로젝트 만들기</li>
+        <li>Realtime Database 활성화 (무료 플랜)</li>
+        <li>이 HTML 파일 상단의 <code>firebaseConfig</code> 값 교체</li>
+        <li>GitHub Pages에 올리면 완성!</li>
+      </ol>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ 앱 메인 화면 ══════════════ -->
+<div id="appScreen">
+
+  <div class="topbar">
+    <div class="topbar-left">
+      <span style="font-size:1.4rem">📅</span>
+      <div>
+        <div class="topbar-name" id="topbarName"></div>
+      </div>
+      <span class="topbar-role" id="topbarRole"></span>
+    </div>
+    <button class="btn-logout" onclick="logout()">나가기</button>
+  </div>
+
+  <!-- 부모 탭 (부모 모드일 때만 표시) -->
+  <div class="parent-tabs no-print" id="parentTabs" style="display:none">
+    <button class="ptab active" id="ptab0" onclick="switchChildTab(0)">🌟 첫째</button>
+    <button class="ptab" id="ptab1" onclick="switchChildTab(1)">⭐ 둘째</button>
+  </div>
+
+  <div class="sync-bar no-print">
+    <div class="sync-dot" id="syncDot"></div>
+    <span id="syncLabel">연결 중...</span>
+  </div>
+
+  <div class="app-content" id="appContent">
+    <div class="presets-panel no-print" id="presetsPanel">
+      <h2>📌 활동 목록 — 클릭해서 선택 후 시간표에 추가하세요</h2>
+      <div class="presets-list" id="presetsList"></div>
+      <div class="add-preset-row">
+        <input type="text" id="newPresetName" placeholder="새 활동 이름..." maxlength="18"/>
+        <div class="color-mini-picker" id="miniColorPicker"></div>
+        <button class="btn-add-preset" onclick="addPreset()">+ 추가</button>
+      </div>
+      <div class="hint" id="hint">💡 활동을 클릭해서 선택한 뒤, 시간표의 <strong>+</strong> 버튼을 누르면 추가됩니다.</div>
+    </div>
+
+    <div class="timetable-wrapper">
+      <table id="tbl">
+        <thead><tr id="hdr"></tr></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+
+    <div class="summary">
+      <h2>📊 주간 요약</h2>
+      <div class="slist" id="slist"><span style="color:#ccc;font-size:0.8rem;">일정을 추가하면 여기에 정리됩니다.</span></div>
+    </div>
+
+    <div class="abar no-print">
+      <button class="abtn ar" id="btnReset" onclick="resetAll()">🗑️ 초기화</button>
+      <button class="abtn aprt" onclick="window.print()">🖨️ 인쇄</button>
+    </div>
+  </div>
+</div>
+
+<!-- 모달 -->
+<div class="overlay" id="ov">
+  <div class="modal">
+    <h3>⏱ 시간 설정</h3>
+    <div class="minfo" id="minfo"></div>
+    <label>선택된 활동</label>
+    <div id="mSelActivity" style="margin-bottom:2px"></div>
+    <label>빠른 선택</label>
+    <div class="dur-btns" id="durQuick"></div>
+    <label>직접 입력</label>
+    <div class="dur-direct">
+      <div class="dur-direct-row">
+        <div class="dur-spin-group">
+          <button class="dur-spin-btn" onclick="stepDur('h',1)">▲</button>
+          <input type="number" id="durH" min="0" max="13" value="0" onchange="onDurInputChange()"/>
+          <button class="dur-spin-btn" onclick="stepDur('h',-1)">▼</button>
+          <span class="dur-unit">시간</span>
+        </div>
+        <div class="dur-spin-group">
+          <button class="dur-spin-btn" onclick="stepDur('m',1)">▲</button>
+          <input type="number" id="durM" min="0" max="30" step="30" value="30" onchange="onDurInputChange()"/>
+          <button class="dur-spin-btn" onclick="stepDur('m',-1)">▼</button>
+          <span class="dur-unit">분</span>
+        </div>
+        <span class="dur-preview" id="durPreview">→ 30분</span>
+      </div>
+      <div id="durMaxInfo" style="font-size:0.68rem;color:#aaa;margin-top:4px;"></div>
+    </div>
+    <label>메모</label>
+    <textarea class="memo-input" id="entryMemo" placeholder="예) 교재 p.30~40, 단어 외우기..." maxlength="200"></textarea>
+    <div class="mactions">
+      <button class="btn bs" onclick="closeModal()">취소</button>
+      <button class="btn bp" onclick="saveEntry()">추가하기 ✨</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════════════
+// 설정값 — 여기서 비밀번호와 아이 이름을 바꾸세요!
+// ══════════════════════════════════════════════════════════════
+const CONFIG = {
+  PARENT_PASSWORD: '3530',   // ← 부모님 비밀번호 (원하는 것으로 변경!)
+  CHILDREN: ['다미', '준이'],  // ← 아이 이름 (원하는 이름으로 변경!)
+};
+
+// ── 상수 ──────────────────────────────────────────────────────
+const DAYS = ['월','화','수','목','금','토','일'];
+const DCLS = ['day-mon','day-tue','day-wed','day-thu','day-fri','day-sat','day-sun'];
+const COLORS = [
+  '#F4A7A7','#F4C08A','#F4E08A','#A7D9A7','#A7C4F4',
+  '#C4A7F4','#F4A7C4','#A7E8E0','#F4D0A7','#B8E8B8',
+  '#E8B8D8','#A7D8E8','#F4B8C8','#B8C8F4','#D8B8F4',
+  '#B8F4D8','#F4E8A7','#C8D8F4','#F4C4B8','#B8F4F0'
+];
+const DEFAULT_PRESETS = [
+  {name:'영어학원', color:'#A7C4F4'},
+  {name:'수학학원', color:'#F4A7A7'},
+  {name:'국어학원', color:'#A7D9A7'},
+  {name:'피아노', color:'#C4A7F4'},
+  {name:'운동', color:'#A7E8E0'},
+  {name:'독서', color:'#F4C08A'},
+  {name:'수학 숙제', color:'#F4B8C8'},
+  {name:'영어 숙제', color:'#B8C8F4'},
+  {name:'자유 시간', color:'#D8B8F4'},
+  {name:'저녁 식사', color:'#F4D0A7'},
+];
+
+function genSlots(startH, endH) {
+  const s=[];
+  for(let h=startH;h<endH;h++){
+    s.push(`${String(h).padStart(2,'0')}:00`);
+    s.push(`${String(h).padStart(2,'0')}:30`);
+  }
+  return s;
+}
+const ALL_SLOTS = genSlots(6, 23);
+
+// ── 상태 ──────────────────────────────────────────────────────
+let currentMode = null;      // 'child' | 'parent'
+let currentChildIdx = null;  // 0 | 1
+let isReadOnly = false;
+let sched = [];
+let presets = [...DEFAULT_PRESETS];
+let selectedPresetIdx = null;
+let newPresetColor = COLORS[4];
+let selDur = 1;
+let cur = null;
+let saveTimer = null;
+let unsubscribe = null;
+
+// ── 진입 화면 ──────────────────────────────────────────────────
+function showStep(id) {
+  ['step-who','step-child','step-parent'].forEach(s => {
+    document.getElementById(s).style.display = s === id ? 'block' : 'none';
+  });
+}
+function backToWho() { showStep('step-who'); }
+
+function showChildSelect() { showStep('step-child'); }
+
+function showParentLogin() {
+  showStep('step-parent');
+  document.getElementById('pwInput').value = '';
+  document.getElementById('pwError').textContent = '';
+  setTimeout(() => document.getElementById('pwInput').focus(), 100);
+}
+
+function enterAsChild(idx) {
+  currentMode = 'child';
+  currentChildIdx = idx;
+  isReadOnly = false;
+  startApp();
+}
+
+function checkPw() {
+  const pw = document.getElementById('pwInput').value;
+  if (pw === CONFIG.PARENT_PASSWORD) {
+    currentMode = 'parent';
+    currentChildIdx = 0;
+    isReadOnly = true;
+    startApp();
+  } else {
+    document.getElementById('pwError').textContent = '비밀번호가 틀렸어요 🙅';
+    document.getElementById('pwInput').select();
+  }
+}
+
+function logout() {
+  if (unsubscribe) { unsubscribe(); unsubscribe = null; }
+  currentMode = null;
+  currentChildIdx = null;
+  document.getElementById('loginScreen').style.display = 'flex';
+  document.getElementById('appScreen').classList.remove('visible');
+}
+
+// ── 앱 시작 ───────────────────────────────────────────────────
+function startApp() {
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('appScreen').classList.add('visible');
+
+  // 탑바
+  document.getElementById('topbarName').textContent =
+    currentMode === 'parent'
+      ? `${CONFIG.CHILDREN[currentChildIdx]}의 스케줄`
+      : `${CONFIG.CHILDREN[currentChildIdx]}의 스케줄`;
+  document.getElementById('topbarRole').textContent =
+    currentMode === 'parent' ? '👁 보기 모드' : '✏️ 편집 모드';
+  document.getElementById('topbarRole').className =
+    'topbar-role' + (currentMode === 'parent' ? ' parent' : '');
+
+  // 부모 탭
+  document.getElementById('parentTabs').style.display =
+    currentMode === 'parent' ? 'flex' : 'none';
+  if (currentMode === 'parent') updateParentTabs();
+
+  // 읽기 전용
+  document.getElementById('appContent').classList.toggle('readonly-mode', isReadOnly);
+  document.getElementById('btnReset').style.display = isReadOnly ? 'none' : '';
+
+  // Firebase 체크
+  const fb = window._fb;
+  if (!fb || !fb.firebaseReady) {
+    document.getElementById('setupBanner').style.display = 'block';
+    setSyncStatus('offline');
+    loadLocal();
+  } else {
+    document.getElementById('setupBanner').style.display = 'none';
+    loadFromFirebase();
+  }
+
+  initSched();
+  buildHeader();
+  buildBody();
+  buildMiniColorPicker();
+  renderPresets();
+  render();
+}
+
+function updateParentTabs() {
+  CONFIG.CHILDREN.forEach((name, i) => {
+    const tab = document.getElementById(`ptab${i}`);
+    tab.textContent = (i === 0 ? '🌟 ' : '⭐ ') + name;
+    tab.className = 'ptab' + (i === currentChildIdx ? ' active' : '');
+  });
+}
+
+function switchChildTab(idx) {
+  if (currentChildIdx === idx) return;
+  currentChildIdx = idx;
+  document.getElementById('topbarName').textContent = `${CONFIG.CHILDREN[idx]}의 스케줄`;
+  updateParentTabs();
+  if (unsubscribe) { unsubscribe(); unsubscribe = null; }
+  const fb = window._fb;
+  if (fb && fb.firebaseReady) {
+    loadFromFirebase();
+  } else {
+    loadLocal();
+    buildBody(); render();
+  }
+}
+
+// ── Firebase ──────────────────────────────────────────────────
+function getDbKey() {
+  return `schedules/child_${currentChildIdx}`;
+}
+
+function loadFromFirebase() {
+  const fb = window._fb;
+  setSyncStatus('syncing');
+  const dbRef = fb.ref(fb.db, getDbKey());
+
+  // 실시간 구독
+  unsubscribe = fb.onValue(dbRef, (snapshot) => {
+    const data = snapshot.val();
+    if (data) {
+      if (data.sched) sched = data.sched;
+      if (data.presets) presets = data.presets;
+    } else {
+      initSched();
+      presets = [...DEFAULT_PRESETS];
+    }
+    renderPresets();
+    buildBody();
+    render();
+    setSyncStatus('synced');
+  }, (error) => {
+    console.error('Firebase 오류:', error);
+    setSyncStatus('offline');
+    loadLocal();
+  });
+}
+
+function saveToFirebase() {
+  const fb = window._fb;
+  if (!fb || !fb.firebaseReady || isReadOnly) return;
+  setSyncStatus('syncing');
+  const dbRef = fb.ref(fb.db, getDbKey());
+  fb.set(dbRef, { sched, presets })
+    .then(() => setSyncStatus('synced'))
+    .catch(() => { setSyncStatus('offline'); saveLocal(); });
+}
+
+// ── 로컬 저장 (Firebase 없을 때 폴백) ─────────────────────────
+function localKey() { return `childSched_v1_child${currentChildIdx}`; }
+
+function saveLocal() {
+  try { localStorage.setItem(localKey(), JSON.stringify({ sched, presets })); } catch(e) {}
+}
+function loadLocal() {
+  try {
+    const raw = localStorage.getItem(localKey());
+    if (raw) {
+      const d = JSON.parse(raw);
+      if (d.sched) sched = d.sched;
+      if (d.presets) presets = d.presets;
+    } else {
+      initSched(); presets = [...DEFAULT_PRESETS];
+    }
+    renderPresets(); buildBody(); render();
+    setSyncStatus('offline');
+  } catch(e) { initSched(); }
+}
+
+function scheduleSave() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    const fb = window._fb;
+    if (fb && fb.firebaseReady) saveToFirebase();
+    else saveLocal();
+  }, 600);
+}
+
+// ── 동기화 상태 ────────────────────────────────────────────────
+function setSyncStatus(status) {
+  const dot = document.getElementById('syncDot');
+  const label = document.getElementById('syncLabel');
+  if (status === 'syncing') {
+    dot.className = 'sync-dot syncing';
+    label.textContent = '동기화 중...';
+  } else if (status === 'synced') {
+    dot.className = 'sync-dot synced';
+    const now = new Date();
+    label.textContent = `실시간 저장됨 · ${now.getHours()}:${String(now.getMinutes()).padStart(2,'0')}`;
+  } else {
+    dot.className = 'sync-dot offline';
+    label.textContent = 'Firebase 미연결 (이 기기에만 저장됩니다)';
+  }
+}
+
+// ── 스케줄 초기화 ──────────────────────────────────────────────
+function initSched() {
+  sched = [];
+  for(let di=0;di<7;di++){
+    sched[di]={};
+    ALL_SLOTS.forEach(s=>sched[di][s]=null);
+  }
+}
+
+// ── 활동 목록 ──────────────────────────────────────────────────
+function renderPresets() {
+  const el = document.getElementById('presetsList');
+  el.innerHTML = '';
+  presets.forEach((p,i) => {
+    const tag = document.createElement('div');
+    tag.className = 'preset-tag' + (i===selectedPresetIdx?' selected-preset':'');
+    tag.style.background = p.color;
+    if (!isReadOnly) {
+      tag.innerHTML = `${p.name}<button class="ptag-del" onclick="event.stopPropagation();removePreset(${i})">✕</button>`;
+      tag.onclick = () => selectPreset(i);
+    } else {
+      tag.innerHTML = p.name;
+      tag.style.cursor = 'default';
+    }
+    el.appendChild(tag);
+  });
+}
+function selectPreset(i) {
+  if (isReadOnly) return;
+  selectedPresetIdx = (selectedPresetIdx===i) ? null : i;
+  renderPresets();
+  const hint = document.getElementById('hint');
+  if (selectedPresetIdx !== null) {
+    hint.style.borderLeftColor = presets[selectedPresetIdx].color;
+    hint.innerHTML = `✅ <strong>${presets[selectedPresetIdx].name}</strong> 선택됨 — 시간표의 <strong>+</strong> 버튼을 누르세요!`;
+  } else {
+    hint.style.borderLeftColor = '#c5caff';
+    hint.innerHTML = '💡 활동을 클릭해서 선택한 뒤, 시간표의 <strong>+</strong> 버튼을 누르면 추가됩니다.';
+  }
+}
+function removePreset(i) {
+  presets.splice(i,1);
+  if(selectedPresetIdx===i) selectedPresetIdx=null;
+  else if(selectedPresetIdx>i) selectedPresetIdx--;
+  renderPresets(); scheduleSave();
+}
+function addPreset() {
+  const inp = document.getElementById('newPresetName');
+  const name = inp.value.trim();
+  if (!name) return;
+  presets.push({name, color: newPresetColor});
+  inp.value = '';
+  renderPresets(); scheduleSave();
+}
+function buildMiniColorPicker() {
+  const el = document.getElementById('miniColorPicker');
+  el.innerHTML = '';
+  COLORS.forEach(c => {
+    const sw = document.createElement('div');
+    sw.className = 'cmsw' + (c===newPresetColor?' sel':'');
+    sw.style.background = c;
+    sw.onclick = () => {
+      newPresetColor = c;
+      document.querySelectorAll('.cmsw').forEach(x=>x.classList.remove('sel'));
+      sw.classList.add('sel');
+    };
+    el.appendChild(sw);
+  });
+}
+
+// ── 테이블 ────────────────────────────────────────────────────
+function buildHeader() {
+  const r = document.getElementById('hdr');
+  r.innerHTML = `<th class="tc">시간</th>` +
+    DAYS.map((d,i)=>`<th class="${DCLS[i]}">${d}</th>`).join('') +
+    `<th class="tc-right">시간</th>`;
+}
+function buildBody() {
+  const tb = document.getElementById('tbody');
+  tb.innerHTML = '';
+  ALL_SLOTS.forEach(slot => {
+    const isHour = slot.endsWith(':00');
+    const tr = document.createElement('tr');
+    if(isHour) tr.classList.add('hr');
+    const tl = document.createElement('td');
+    tl.className = 'tl' + (isHour?' h':'');
+    tl.textContent = isHour ? slot : '·30';
+    tr.appendChild(tl);
+    for(let di=0;di<7;di++){
+      const td = document.createElement('td');
+      td.dataset.di = di; td.dataset.slot = slot;
+      const inner = document.createElement('div');
+      inner.className = 'cell-inner';
+      td.appendChild(inner);
+      tr.appendChild(td);
+    }
+    const trRight = document.createElement('td');
+    trRight.className = 'tr' + (isHour?' h':'');
+    trRight.textContent = isHour ? slot : '·30';
+    tr.appendChild(trRight);
+    tb.appendChild(tr);
+  });
+}
+
+// ── 렌더 ──────────────────────────────────────────────────────
+function render() {
+  document.querySelectorAll('td[data-di]').forEach(td => {
+    const inner = td.querySelector('.cell-inner');
+    if(inner) inner.innerHTML = '';
+    td.style.display = '';
+    td.removeAttribute('rowspan');
+  });
+  for(let di=0;di<7;di++){
+    const skipSet = new Set();
+    ALL_SLOTS.forEach(slot => {
+      if(skipSet.has(slot)) return;
+      const e = sched[di] && sched[di][slot];
+      const td = document.querySelector(`td[data-di="${di}"][data-slot="${slot}"]`);
+      if(!td) return;
+      const inner = td.querySelector('.cell-inner');
+      if(!inner) return;
+      if(e && !e._ref){
+        const span = e.span||1;
+        if(span>1){
+          td.rowSpan = span;
+          const si = ALL_SLOTS.indexOf(slot);
+          for(let s=1;s<span;s++){
+            const cs = ALL_SLOTS[si+s];
+            if(cs){
+              skipSet.add(cs);
+              const ctd = document.querySelector(`td[data-di="${di}"][data-slot="${cs}"]`);
+              if(ctd) ctd.style.display = 'none';
+            }
+          }
+        }
+        const durMin = span*30;
+        const dh=Math.floor(durMin/60),dm=durMin%60;
+        const dstr = dh>0?(dm>0?`${dh}시간 ${dm}분`:`${dh}시간`):`${dm}분`;
+        const chip = document.createElement('div');
+        chip.className = 'chip';
+        chip.style.cssText = `background:${e.color};min-height:${span*32-4}px;`;
+        chip.innerHTML = `<span class="chip-name">${e.name}</span>${span>1?`<span class="chip-dur">${dstr}</span>`:''}`+
+          `${e.memo?`<span class="chip-memo">${e.memo}</span>`:''}` +
+          (isReadOnly?'':`<button class="del" onclick="event.stopPropagation();delEntry(${di},'${slot}')">✕</button>`);
+        inner.appendChild(chip);
+      } else if(!e && !isReadOnly){
+        const btn = document.createElement('button');
+        btn.className = 'addbtn no-print';
+        btn.textContent = '+';
+        const si = ALL_SLOTS.indexOf(slot);
+        btn.onclick = ev => { ev.stopPropagation(); onCellClick(di,si); };
+        inner.appendChild(btn);
+      }
+    });
+  }
+  renderSummary();
+}
+
+// ── 셀 클릭 / 모달 ───────────────────────────────────────────
+function onCellClick(di,si){
+  if(isReadOnly) return;
+  if(selectedPresetIdx===null){
+    const hint=document.getElementById('hint');
+    hint.style.background='#fff3bf';hint.style.borderLeftColor='#FAB005';
+    hint.innerHTML='👆 먼저 위의 활동 목록에서 활동을 클릭해 선택해주세요!';
+    setTimeout(()=>{hint.style.background='#f8f9ff';hint.style.borderLeftColor='#c5caff';
+      hint.innerHTML='💡 활동을 클릭해서 선택한 뒤, 시간표의 <strong>+</strong> 버튼을 누르면 추가됩니다.';},2000);
+    return;
+  }
+  cur={di,si};
+  const slot=ALL_SLOTS[si];
+  document.getElementById('minfo').textContent=`${DAYS[di]}요일 ${slot}`;
+  const p=presets[selectedPresetIdx];
+  document.getElementById('mSelActivity').innerHTML=
+    `<div style="display:inline-block;padding:4px 12px;border-radius:20px;background:${p.color};color:#3a3a5c;font-size:0.8rem;font-weight:700;">${p.name}</div>`;
+  selDur=1; buildDurs(di,si);
+  document.getElementById('entryMemo').value='';
+  document.getElementById('ov').classList.add('open');
+}
+function closeModal(){document.getElementById('ov').classList.remove('open');cur=null;}
+
+function buildDurs(di,si){
+  const quickOpts=[{l:'30분',s:1},{l:'1시간',s:2},{l:'1시간30분',s:3},{l:'2시간',s:4},{l:'3시간',s:6},{l:'4시간',s:8}];
+  const maxAvail=ALL_SLOTS.length-si;
+  const quick=document.getElementById('durQuick');
+  quick.innerHTML='';
+  quickOpts.forEach(opt=>{
+    if(opt.s>maxAvail)return;
+    let canFit=true;
+    for(let s=0;s<opt.s;s++){
+      const cs=ALL_SLOTS[si+s];
+      if(!cs||sched[di][cs]){canFit=false;break;}
+    }
+    const b=document.createElement('button');
+    b.className='db'+(opt.s===selDur?' sel':'');
+    b.textContent=opt.l;
+    if(!canFit)b.disabled=true;
+    else b.onclick=()=>{
+      selDur=opt.s;
+      const totalMin=selDur*30;
+      document.getElementById('durH').value=Math.floor(totalMin/60);
+      document.getElementById('durM').value=totalMin%60;
+      updateDurPreview();
+      document.querySelectorAll('.db').forEach(x=>x.classList.remove('sel'));
+      b.classList.add('sel');
+    };
+    quick.appendChild(b);
+  });
+  const totalMin=selDur*30;
+  document.getElementById('durH').value=Math.floor(totalMin/60);
+  document.getElementById('durM').value=totalMin%60;
+  document.getElementById('durMaxInfo').textContent=`최대 ${Math.floor(maxAvail/2)}시간 ${(maxAvail%2)*30>0?(maxAvail%2)*30+'분':''}`;
+  updateDurPreview();
+}
+function stepDur(field,dir){
+  const hEl=document.getElementById('durH'),mEl=document.getElementById('durM');
+  if(field==='h'){let v=parseInt(hEl.value)||0;hEl.value=Math.max(0,v+dir);}
+  else{let m=parseInt(mEl.value)||0;if(dir>0&&m===30){hEl.value=(parseInt(hEl.value)||0)+1;mEl.value=0;}else if(dir<0&&m===0&&(parseInt(hEl.value)||0)>0){hEl.value=(parseInt(hEl.value)||0)-1;mEl.value=30;}else{mEl.value=m===0?30:0;}}
+  onDurInputChange();
+}
+function onDurInputChange(){
+  const h=parseInt(document.getElementById('durH').value)||0;
+  const m=parseInt(document.getElementById('durM').value)||0;
+  const mSnap=(m>=15)?30:0;
+  document.getElementById('durM').value=mSnap;
+  selDur=Math.max(1,Math.round((h*60+mSnap)/30));
+  updateDurPreview();
+  document.querySelectorAll('.db').forEach(b=>{const bSpan=parseInt(b.dataset.span||'0');b.classList.toggle('sel',bSpan===selDur);});
+}
+function updateDurPreview(){
+  const totalMin=selDur*30,h=Math.floor(totalMin/60),m=totalMin%60;
+  document.getElementById('durPreview').textContent=`→ ${h>0?(m>0?`${h}시간 ${m}분`:`${h}시간`):`${m}분`}`;
+}
+
+function saveEntry(){
+  if(!cur)return;
+  const p=presets[selectedPresetIdx];if(!p)return;
+  const{di,si}=cur;
+  const anchor=ALL_SLOTS[si];
+  const memo=document.getElementById('entryMemo').value.trim();
+  sched[di][anchor]={name:p.name,color:p.color,span:selDur,memo};
+  for(let s=1;s<selDur;s++){const sl=ALL_SLOTS[si+s];if(sl)sched[di][sl]={_ref:anchor};}
+  closeModal();buildBody();render();scheduleSave();
+}
+function delEntry(di,slot){
+  const e=sched[di][slot];if(!e)return;
+  const span=e.span||1,si=ALL_SLOTS.indexOf(slot);
+  for(let s=0;s<span;s++){const sl=ALL_SLOTS[si+s];if(sl)sched[di][sl]=null;}
+  buildBody();render();scheduleSave();
+}
+
+// ── 요약 ──────────────────────────────────────────────────────
+function renderSummary(){
+  const counts={};
+  for(let di=0;di<7;di++){
+    ALL_SLOTS.forEach(slot=>{
+      const e=sched[di]&&sched[di][slot];
+      if(e&&!e._ref){
+        const k=`${e.name}||${e.color}`;
+        if(!counts[k])counts[k]={name:e.name,color:e.color,sessions:0,totalSlots:0};
+        counts[k].sessions++;counts[k].totalSlots+=e.span||1;
+      }
+    });
+  }
+  const el=document.getElementById('slist');el.innerHTML='';
+  const arr=Object.values(counts);
+  if(!arr.length){el.innerHTML='<span style="color:#ccc;font-size:0.78rem;">일정을 추가하면 여기에 정리됩니다.</span>';return;}
+  arr.sort((a,b)=>b.totalSlots-a.totalSlots).forEach(e=>{
+    const tm=e.totalSlots*30,h=Math.floor(tm/60),m=tm%60;
+    const ts=h>0?(m>0?`${h}시간 ${m}분`:`${h}시간`):`${m}분`;
+    const tag=document.createElement('div');
+    tag.className='stag';tag.style.background=e.color;tag.style.color='#3a3a5c';
+    tag.innerHTML=`${e.name}<span class="scnt">${e.sessions}회 · ${ts}</span>`;
+    el.appendChild(tag);
+  });
+}
+
+function resetAll(){
+  if(isReadOnly)return;
+  if(confirm('모든 일정을 초기화할까요?')){
+    initSched();buildBody();render();scheduleSave();
+  }
+}
+
+// ── 이벤트 ────────────────────────────────────────────────────
+document.getElementById('newPresetName').addEventListener('keydown',e=>{if(e.key==='Enter')addPreset();});
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape')closeModal();
+  if(e.key==='Enter'&&document.getElementById('ov').classList.contains('open'))saveEntry();
+});
+document.getElementById('ov').addEventListener('click',e=>{if(e.target===document.getElementById('ov'))closeModal();});
+
+// Firebase 모듈 로드 대기
+window.addEventListener('load', () => {
+  // setupBanner: Firebase 미설정 시 로그인 화면에 안내 표시
+  const fb = window._fb;
+  if (!fb || !fb.firebaseReady) {
+    document.getElementById('setupBanner').style.display = 'block';
+  }
+});
+</script>
+</body>
+</html>
