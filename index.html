@@ -734,7 +734,15 @@ function startApp() {
   document.getElementById('appContent').classList.toggle('readonly-mode', isReadOnly);
   document.getElementById('btnReset').style.display = isReadOnly ? 'none' : '';
 
-  // Firebase 체크
+  // 먼저 UI 초기화
+  initSched();
+  buildHeader();
+  buildBody();
+  buildMiniColorPicker();
+  renderPresets();
+  render();
+
+  // Firebase 체크 (initSched 이후에 실행해야 데이터가 덮어써지지 않음)
   const fb = window._fb;
   if (!fb || !fb.firebaseReady) {
     document.getElementById('setupBanner').style.display = 'block';
@@ -744,13 +752,6 @@ function startApp() {
     document.getElementById('setupBanner').style.display = 'none';
     loadFromFirebase();
   }
-
-  initSched();
-  buildHeader();
-  buildBody();
-  buildMiniColorPicker();
-  renderPresets();
-  render();
 }
 
 function updateParentTabs() {
