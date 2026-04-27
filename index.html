@@ -767,6 +767,10 @@ function switchChildTab(idx) {
   currentChildIdx = idx;
   document.getElementById('topbarName').textContent = `${CONFIG.CHILDREN[idx]}의 스케줄`;
   updateParentTabs();
+  // 먼저 화면 초기화
+  initSched();
+  buildBody();
+  render();
   if (unsubscribe) { unsubscribe(); unsubscribe = null; }
   const fb = window._fb;
   if (fb && fb.firebaseReady) {
